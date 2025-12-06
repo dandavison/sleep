@@ -67,6 +67,12 @@
     <div class="legend-item"><div class="legend-color" style="background: transparent; border: 2px solid #C9A86C"></div>Awake</div>
   </div>
 
+  <div class="chart-container" id="scatter-container" style="margin-top: 24px">
+    <div class="chart-scroll" id="scatter-scroll">
+      <canvas id="scatter-chart"></canvas>
+    </div>
+  </div>
+
   <script>
     const COLORS = {
       deep: '#7B5BA4',
@@ -91,7 +97,10 @@
       document.getElementById('timeline-scroll').style.width = chartWidth + 'px';
       createTimelineChart(data, labels);
 
-      // Scroll both to the right
+      // Scatter plot (bedtime vs duration)
+      createScatterChart(data);
+
+      // Scroll bar charts to the right
       document.getElementById('duration-container').scrollLeft = chartWidth;
       document.getElementById('timeline-container').scrollLeft = chartWidth;
     }
@@ -195,6 +204,66 @@
                 color: '#888',
                 stepSize: 60,
                 callback: v => minutesToClock(v)
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function createScatterChart(data) {
+      const points = data.map(d => ({
+        x: timeToMinutesFrom6pm(d.startTime),
+        y: d.deep + d.light + d.rem,  // actual sleep (excluding awake)
+        date: d.date
+      }));
+
+      const ctx = document.getElementById('scatter-chart').getContext('2d');
+      new Chart(ctx, {
+        type: 'scatter',
+        data: {
+          datasets: [{
+            data: points,
+            backgroundColor: COLORS.light,
+            borderColor: COLORS.deep,
+            borderWidth: 1,
+            pointRadius: 6,
+            pointHoverRadius: 8,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => {
+                  const p = ctx.raw;
+                  return `${formatDate(p.date)}: bed ${minutesToClock(p.x)}, slept ${formatDuration(p.y)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: '#333' },
+              min: 300,  // 10pm
+              max: 420,  // 1am
+              ticks: {
+                color: '#888',
+                stepSize: 30,
+                callback: v => minutesToClock(v)
+              }
+            },
+            y: {
+              grid: { color: '#333' },
+              min: 240,  // 4h
+              max: 480,  // 8h
+              ticks: {
+                color: '#888',
+                stepSize: 60,
+                callback: v => formatDuration(v)
               }
             }
           }
