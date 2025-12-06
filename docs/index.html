@@ -14,12 +14,14 @@
       min-height: 100vh;
       padding: 16px;
     }
-    h1 {
-      font-size: 1.25rem;
+    h2 {
+      font-size: 1.1rem;
       font-weight: 500;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
+      margin-top: 24px;
       color: #fff;
     }
+    h2:first-of-type { margin-top: 0; }
     .chart-container {
       position: relative;
       width: 100%;
@@ -28,13 +30,13 @@
     }
     .chart-scroll {
       min-width: 100%;
-      height: 300px;
+      height: 280px;
     }
     .legend {
       display: flex;
       gap: 16px;
       flex-wrap: wrap;
-      margin-top: 16px;
+      margin-top: 12px;
       font-size: 0.875rem;
     }
     .legend-item {
@@ -49,18 +51,26 @@
     }
     @media (orientation: landscape) and (max-height: 500px) {
       body { padding: 8px; }
-      h1 { font-size: 1rem; margin-bottom: 8px; }
-      .chart-scroll { height: 200px; }
+      h2 { font-size: 1rem; margin-bottom: 8px; }
+      .chart-scroll { height: 180px; }
     }
   </style>
 </head>
 <body>
-  <h1>Sleep Stages</h1>
-  <div class="chart-container">
-    <div class="chart-scroll">
-      <canvas id="chart"></canvas>
+  <h2>Sleep Duration</h2>
+  <div class="chart-container" id="duration-container">
+    <div class="chart-scroll" id="duration-scroll">
+      <canvas id="duration-chart"></canvas>
     </div>
   </div>
+
+  <h2>Sleep Timeline</h2>
+  <div class="chart-container" id="timeline-container">
+    <div class="chart-scroll" id="timeline-scroll">
+      <canvas id="timeline-chart"></canvas>
+    </div>
+  </div>
+
   <div class="legend">
     <div class="legend-item"><div class="legend-color" style="background: #7B5BA4"></div>Deep</div>
     <div class="legend-item"><div class="legend-color" style="background: #A895C4"></div>Light</div>
@@ -81,14 +91,24 @@
       const data = await resp.json();
 
       const labels = data.map(d => formatDate(d.date));
-      const barWidth = Math.max(40, 60);
+      const barWidth = 80;
       const chartWidth = Math.max(labels.length * barWidth, window.innerWidth - 32);
 
-      const scrollContainer = document.querySelector('.chart-scroll');
-      scrollContainer.style.width = chartWidth + 'px';
+      // Duration chart (stacked totals)
+      document.getElementById('duration-scroll').style.width = chartWidth + 'px';
+      createDurationChart(data, labels);
 
-      const ctx = document.getElementById('chart').getContext('2d');
+      // Timeline chart (segments by clock time)
+      document.getElementById('timeline-scroll').style.width = chartWidth + 'px';
+      createTimelineChart(data, labels);
 
+      // Scroll both to the right
+      document.getElementById('duration-container').scrollLeft = chartWidth;
+      document.getElementById('timeline-container').scrollLeft = chartWidth;
+    }
+
+    function createDurationChart(data, labels) {
+      const ctx = document.getElementById('duration-chart').getContext('2d');
       new Chart(ctx, {
         type: 'bar',
         data: {
@@ -107,37 +127,122 @@
             legend: { display: false },
             tooltip: {
               callbacks: {
-                label: ctx => `${ctx.dataset.label}: ${formatMinutes(ctx.raw)}`,
+                label: ctx => `${ctx.dataset.label}: ${formatDuration(ctx.raw)}`,
                 afterBody: items => {
                   const idx = items[0].dataIndex;
                   const d = data[idx];
                   const total = d.deep + d.light + d.rem + d.wake;
-                  return `Total: ${formatMinutes(total)}`;
+                  return `Total: ${formatDuration(total)}`;
                 }
               }
             }
           },
           scales: {
-            x: {
-              stacked: true,
-              grid: { display: false },
-              ticks: { color: '#888' }
-            },
+            x: { stacked: true, grid: { display: false }, ticks: { color: '#888' } },
+            y: { stacked: true, grid: { color: '#333' }, ticks: { color: '#888', callback: v => formatDuration(v) } }
+          }
+        }
+      });
+    }
+
+    function createTimelineChart(data, labels) {
+      // Build datasets: one per stage, with floating bars [start, end] in "minutes from 6pm"
+      const stages = ['deep', 'light', 'rem', 'wake'];
+      const datasets = stages.map(stage => ({
+        label: stage.charAt(0).toUpperCase() + stage.slice(1),
+        data: data.map((d, i) => buildSegmentsForStage(d.segments, stage)),
+        backgroundColor: stage === 'wake' ? 'transparent' : COLORS[stage],
+        borderColor: COLORS[stage],
+        borderWidth: stage === 'wake' ? 2 : 0,
+        barPercentage: 0.8,
+      }));
+
+      // Flatten: each segment becomes its own bar positioned at the correct x index
+      const flatDatasets = [];
+      stages.forEach(stage => {
+        data.forEach((d, dateIdx) => {
+          const segs = buildSegmentsForStage(d.segments, stage);
+          segs.forEach(seg => {
+            flatDatasets.push({
+              label: stage,
+              data: labels.map((_, i) => i === dateIdx ? seg : null),
+              backgroundColor: stage === 'wake' ? 'transparent' : COLORS[stage],
+              borderColor: COLORS[stage],
+              borderWidth: stage === 'wake' ? 2 : 1,
+              borderSkipped: false,
+              barPercentage: 0.6,
+              categoryPercentage: 0.8,
+            });
+          });
+        });
+      });
+
+      const ctx = document.getElementById('timeline-chart').getContext('2d');
+      new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: flatDatasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => {
+                  if (!ctx.raw) return '';
+                  const [start, end] = ctx.raw;
+                  return `${ctx.dataset.label}: ${minutesToClock(start)} - ${minutesToClock(end)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: { stacked: true, grid: { display: false }, ticks: { color: '#888' } },
             y: {
-              stacked: true,
               grid: { color: '#333' },
+              reverse: true,
+              min: 300,  // 10pm
+              max: 780,  // 7am next day
               ticks: {
                 color: '#888',
-                callback: v => formatMinutes(v)
+                stepSize: 60,
+                callback: v => minutesToClock(v)
               }
             }
           }
         }
       });
+    }
 
-      // Scroll to the right (most recent)
-      const container = document.querySelector('.chart-container');
-      container.scrollLeft = container.scrollWidth;
+    function buildSegmentsForStage(segments, stage) {
+      // Return array of [startMinutes, endMinutes] for segments matching this stage
+      return segments
+        .filter(s => s.level === stage)
+        .map(s => {
+          const start = timeToMinutesFrom6pm(s.dateTime);
+          const end = start + s.seconds / 60;
+          return [start, end];
+        });
+    }
+
+    function timeToMinutesFrom6pm(isoString) {
+      // Convert ISO time to minutes from 6pm (so 6pm=0, midnight=360, 6am=720)
+      const d = new Date(isoString);
+      const hours = d.getHours();
+      const mins = d.getMinutes();
+      const totalMins = hours * 60 + mins;
+      // Shift so 6pm (18:00 = 1080) becomes 0
+      return totalMins >= 1080 ? totalMins - 1080 : totalMins + 360;
+    }
+
+    function minutesToClock(mins) {
+      // Convert minutes-from-6pm back to clock time
+      const actualMins = mins >= 360 ? mins - 360 : mins + 1080;
+      const h = Math.floor(actualMins / 60) % 24;
+      const m = Math.floor(actualMins % 60);
+      const suffix = h >= 12 ? 'pm' : 'am';
+      const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+      return `${h12}${m > 0 ? ':' + String(m).padStart(2, '0') : ''}${suffix}`;
     }
 
     function formatDate(dateStr) {
@@ -145,9 +250,9 @@
       return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
 
-    function formatMinutes(mins) {
+    function formatDuration(mins) {
       const h = Math.floor(mins / 60);
-      const m = mins % 60;
+      const m = Math.round(mins % 60);
       return h > 0 ? `${h}h ${m}m` : `${m}m`;
     }
 

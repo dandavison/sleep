@@ -81,6 +81,9 @@ def build():
 def transform_for_chart(record: dict) -> dict:
     """Extract chart-relevant fields from a Fitbit sleep record."""
     summary = record.get("levels", {}).get("summary", {})
+    levels = record.get("levels", {})
+    segments = levels.get("data", []) + levels.get("shortData", [])
+    segments.sort(key=lambda s: s["dateTime"])
     return {
         "date": record["dateOfSleep"],
         "deep": summary.get("deep", {}).get("minutes", 0),
@@ -90,6 +93,7 @@ def transform_for_chart(record: dict) -> dict:
         "efficiency": record.get("efficiency", 0),
         "startTime": record.get("startTime"),
         "endTime": record.get("endTime"),
+        "segments": segments,
     }
 
 
