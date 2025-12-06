@@ -65,7 +65,7 @@
     <div class="legend-item"><div class="legend-color" style="background: #7B5BA4"></div>Deep</div>
     <div class="legend-item"><div class="legend-color" style="background: #A895C4"></div>Light</div>
     <div class="legend-item"><div class="legend-color" style="background: #F5F0E8"></div>REM</div>
-    <div class="legend-item"><div class="legend-color" style="background: #C9A86C"></div>Awake</div>
+    <div class="legend-item"><div class="legend-color" style="background: transparent; border: 2px solid #C9A86C"></div>Awake</div>
   </div>
 
   <script>
@@ -97,7 +97,7 @@
             { label: 'Deep', data: data.map(d => d.deep), backgroundColor: COLORS.deep },
             { label: 'Light', data: data.map(d => d.light), backgroundColor: COLORS.light },
             { label: 'REM', data: data.map(d => d.rem), backgroundColor: COLORS.rem },
-            { label: 'Awake', data: data.map(d => d.wake), backgroundColor: COLORS.wake },
+            { label: 'Awake', data: data.map(d => d.wake), backgroundColor: 'transparent', borderColor: COLORS.wake, borderWidth: 2 },
           ]
         },
         options: {
