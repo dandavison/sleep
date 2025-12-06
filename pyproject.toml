@@ -1,0 +1,20 @@
+[project]
+name = "sleep"
+version = "0.1.0"
+description = "Fitbit sleep data tracker"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "httpx>=0.28.1",
+    "typer>=0.20.0",
+]
+
+[project.scripts]
+sleep = "sleep.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sleep"]
