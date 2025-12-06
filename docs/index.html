@@ -14,14 +14,8 @@
       min-height: 100vh;
       padding: 24px;
     }
-    .chart-container {
-      position: relative;
+    .chart-box {
       width: 100%;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-    .chart-scroll {
-      min-width: 100%;
       height: 280px;
     }
     .legend {
@@ -43,21 +37,17 @@
     }
     @media (orientation: landscape) and (max-height: 500px) {
       body { padding: 8px; }
-      .chart-scroll { height: 180px; }
+      .chart-box { height: 180px; }
     }
   </style>
 </head>
 <body>
-  <div class="chart-container" id="duration-container">
-    <div class="chart-scroll" id="duration-scroll">
-      <canvas id="duration-chart"></canvas>
-    </div>
+  <div class="chart-box">
+    <canvas id="duration-chart"></canvas>
   </div>
 
-  <div class="chart-container" id="timeline-container" style="margin-top: 24px">
-    <div class="chart-scroll" id="timeline-scroll">
-      <canvas id="timeline-chart"></canvas>
-    </div>
+  <div class="chart-box" style="margin-top: 24px">
+    <canvas id="timeline-chart"></canvas>
   </div>
 
   <div class="legend">
@@ -84,23 +74,10 @@
       const data = await resp.json();
 
       const labels = data.map(d => formatDate(d.date));
-      const barWidth = 80;
-      const chartWidth = Math.max(labels.length * barWidth, window.innerWidth - 32);
 
-      // Duration chart (stacked totals)
-      document.getElementById('duration-scroll').style.width = chartWidth + 'px';
       createDurationChart(data, labels);
-
-      // Timeline chart (segments by clock time)
-      document.getElementById('timeline-scroll').style.width = chartWidth + 'px';
       createTimelineChart(data, labels);
-
-      // Scatter plot (bedtime vs duration)
       createScatterChart(data);
-
-      // Scroll bar charts to the right
-      document.getElementById('duration-container').scrollLeft = chartWidth;
-      document.getElementById('timeline-container').scrollLeft = chartWidth;
     }
 
     function createDurationChart(data, labels) {
