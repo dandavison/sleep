@@ -14,14 +14,6 @@
       min-height: 100vh;
       padding: 16px;
     }
-    h2 {
-      font-size: 1.1rem;
-      font-weight: 500;
-      margin-bottom: 12px;
-      margin-top: 24px;
-      color: #fff;
-    }
-    h2:first-of-type { margin-top: 0; }
     .chart-container {
       position: relative;
       width: 100%;
@@ -51,21 +43,18 @@
     }
     @media (orientation: landscape) and (max-height: 500px) {
       body { padding: 8px; }
-      h2 { font-size: 1rem; margin-bottom: 8px; }
       .chart-scroll { height: 180px; }
     }
   </style>
 </head>
 <body>
-  <h2>Sleep Duration</h2>
   <div class="chart-container" id="duration-container">
     <div class="chart-scroll" id="duration-scroll">
       <canvas id="duration-chart"></canvas>
     </div>
   </div>
 
-  <h2>Sleep Timeline</h2>
-  <div class="chart-container" id="timeline-container">
+  <div class="chart-container" id="timeline-container" style="margin-top: 24px">
     <div class="chart-scroll" id="timeline-scroll">
       <canvas id="timeline-chart"></canvas>
     </div>
@@ -201,7 +190,7 @@
             y: {
               grid: { color: '#333' },
               min: 300,  // 10pm
-              max: 780,  // 7am next day
+              max: 820,  // ~7:40am next day
               ticks: {
                 color: '#888',
                 stepSize: 60,
