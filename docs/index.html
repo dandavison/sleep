@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sleep</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #1a1a1a;
+      color: #e0e0e0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 500;
+      margin-bottom: 16px;
+      color: #fff;
+    }
+    .chart-container {
+      position: relative;
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .chart-scroll {
+      min-width: 100%;
+      height: 300px;
+    }
+    .legend {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+      font-size: 0.875rem;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+    }
+    @media (orientation: landscape) and (max-height: 500px) {
+      body { padding: 8px; }
+      h1 { font-size: 1rem; margin-bottom: 8px; }
+      .chart-scroll { height: 200px; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Sleep Stages</h1>
+  <div class="chart-container">
+    <div class="chart-scroll">
+      <canvas id="chart"></canvas>
+    </div>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-color" style="background: #7B5BA4"></div>Deep</div>
+    <div class="legend-item"><div class="legend-color" style="background: #A895C4"></div>Light</div>
+    <div class="legend-item"><div class="legend-color" style="background: #F5F0E8"></div>REM</div>
+    <div class="legend-item"><div class="legend-color" style="background: #C9A86C"></div>Awake</div>
+  </div>
+
+  <script>
+    const COLORS = {
+      deep: '#7B5BA4',
+      light: '#A895C4',
+      rem: '#F5F0E8',
+      wake: '#C9A86C'
+    };
+
+    async function init() {
+      const resp = await fetch('data.json');
+      const data = await resp.json();
+
+      const labels = data.map(d => formatDate(d.date));
+      const barWidth = Math.max(40, 60);
+      const chartWidth = Math.max(labels.length * barWidth, window.innerWidth - 32);
+
+      const scrollContainer = document.querySelector('.chart-scroll');
+      scrollContainer.style.width = chartWidth + 'px';
+
+      const ctx = document.getElementById('chart').getContext('2d');
+
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Deep', data: data.map(d => d.deep), backgroundColor: COLORS.deep },
+            { label: 'Light', data: data.map(d => d.light), backgroundColor: COLORS.light },
+            { label: 'REM', data: data.map(d => d.rem), backgroundColor: COLORS.rem },
+            { label: 'Awake', data: data.map(d => d.wake), backgroundColor: COLORS.wake },
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => `${ctx.dataset.label}: ${formatMinutes(ctx.raw)}`,
+                afterBody: items => {
+                  const idx = items[0].dataIndex;
+                  const d = data[idx];
+                  const total = d.deep + d.light + d.rem + d.wake;
+                  return `Total: ${formatMinutes(total)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              stacked: true,
+              grid: { display: false },
+              ticks: { color: '#888' }
+            },
+            y: {
+              stacked: true,
+              grid: { color: '#333' },
+              ticks: {
+                color: '#888',
+                callback: v => formatMinutes(v)
+              }
+            }
+          }
+        }
+      });
+
+      // Scroll to the right (most recent)
+      const container = document.querySelector('.chart-container');
+      container.scrollLeft = container.scrollWidth;
+    }
+
+    function formatDate(dateStr) {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
+    function formatMinutes(mins) {
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    }
+
+    init();
+  </script>
+</body>
+</html>
+
