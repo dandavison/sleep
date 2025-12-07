@@ -57,8 +57,16 @@
     <div class="legend-item"><div class="legend-color" style="background: transparent; border: 2px solid #C9A86C"></div>Awake</div>
   </div>
 
-  <div style="margin-top: 24px; width: 350px; height: 350px">
-    <canvas id="scatter-chart"></canvas>
+  <div style="margin-top: 24px; display: flex; gap: 24px; flex-wrap: wrap">
+    <div style="width: 300px; height: 300px">
+      <canvas id="scatter-chart"></canvas>
+    </div>
+    <div style="width: 300px; height: 300px">
+      <canvas id="duration-vs-rested"></canvas>
+    </div>
+    <div style="width: 300px; height: 300px">
+      <canvas id="bedtime-vs-rested"></canvas>
+    </div>
   </div>
 
   <script>
@@ -78,6 +86,8 @@
       createDurationChart(data, labels);
       createTimelineChart(data);
       createScatterChart(data);
+      createDurationVsRested(data);
+      createBedtimeVsRested(data);
     }
 
     function createDurationChart(data, labels) {
@@ -259,6 +269,118 @@
                 stepSize: 60,
                 callback: v => formatDuration(v)
               }
+            }
+          }
+        }
+      });
+    }
+
+    function createDurationVsRested(data) {
+      const points = data
+        .filter(d => d.subjective?.score != null)
+        .map(d => ({
+          x: d.deep + d.light + d.rem,
+          y: d.subjective.score,
+          date: d.date
+        }));
+
+      const ctx = document.getElementById('duration-vs-rested').getContext('2d');
+      new Chart(ctx, {
+        type: 'scatter',
+        data: {
+          datasets: [{
+            data: points,
+            backgroundColor: COLORS.light,
+            borderColor: COLORS.deep,
+            borderWidth: 1,
+            pointRadius: 6,
+            pointHoverRadius: 8,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => {
+                  const p = ctx.raw;
+                  return `${formatDate(p.date)}: ${formatDuration(p.x)} → ${p.y}/10`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: '#333' },
+              min: 240,
+              max: 480,
+              ticks: { color: '#888', callback: v => formatDuration(v) },
+              title: { display: true, text: 'Sleep duration', color: '#888' }
+            },
+            y: {
+              grid: { color: '#333' },
+              min: 0,
+              max: 10,
+              ticks: { color: '#888', stepSize: 2 },
+              title: { display: true, text: 'Rested', color: '#888' }
+            }
+          }
+        }
+      });
+    }
+
+    function createBedtimeVsRested(data) {
+      const points = data
+        .filter(d => d.subjective?.score != null)
+        .map(d => ({
+          x: timeToMinutesFrom6pm(d.startTime),
+          y: d.subjective.score,
+          date: d.date
+        }));
+
+      const ctx = document.getElementById('bedtime-vs-rested').getContext('2d');
+      new Chart(ctx, {
+        type: 'scatter',
+        data: {
+          datasets: [{
+            data: points,
+            backgroundColor: COLORS.light,
+            borderColor: COLORS.deep,
+            borderWidth: 1,
+            pointRadius: 6,
+            pointHoverRadius: 8,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => {
+                  const p = ctx.raw;
+                  return `${formatDate(p.date)}: bed ${minutesToClock(p.x)} → ${p.y}/10`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: '#333' },
+              min: 300,
+              max: 420,
+              ticks: { color: '#888', stepSize: 30, callback: v => minutesToClock(v) },
+              title: { display: true, text: 'Bedtime', color: '#888' }
+            },
+            y: {
+              grid: { color: '#333' },
+              min: 0,
+              max: 10,
+              ticks: { color: '#888', stepSize: 2 },
+              title: { display: true, text: 'Rested', color: '#888' }
             }
           }
         }
