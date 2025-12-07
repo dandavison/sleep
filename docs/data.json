@@ -228,6 +228,7 @@
     "activities": [
       {
         "name": "Walk",
+        "date": "2025-11-30",
         "startTime": "2025-11-30T09:11:10.763-05:00",
         "duration": 83,
         "distance": 5.77,
@@ -235,6 +236,17 @@
       },
       {
         "name": "Structured Workout",
+        "date": "2025-11-30",
+        "startTime": "2025-11-30T17:21:08.323-05:00",
+        "duration": 27,
+        "distance": 5.75,
+        "speed": 13.0
+      }
+    ],
+    "runs": [
+      {
+        "name": "Structured Workout",
+        "date": "2025-11-30",
         "startTime": "2025-11-30T17:21:08.323-05:00",
         "duration": 27,
         "distance": 5.75,
@@ -453,7 +465,8 @@
         "seconds": 120
       }
     ],
-    "activities": []
+    "activities": [],
+    "runs": []
   },
   {
     "date": "2025-12-02",
@@ -711,7 +724,8 @@
         "seconds": 60
       }
     ],
-    "activities": []
+    "activities": [],
+    "runs": []
   },
   {
     "date": "2025-12-03",
@@ -929,7 +943,8 @@
         "seconds": 540
       }
     ],
-    "activities": []
+    "activities": [],
+    "runs": []
   },
   {
     "date": "2025-12-04",
@@ -1267,7 +1282,8 @@
         "seconds": 330
       }
     ],
-    "activities": []
+    "activities": [],
+    "runs": []
   },
   {
     "date": "2025-12-05",
@@ -1480,7 +1496,8 @@
         "seconds": 960
       }
     ],
-    "activities": []
+    "activities": [],
+    "runs": []
   },
   {
     "date": "2025-12-06",
@@ -1743,7 +1760,8 @@
         "seconds": 150
       }
     ],
-    "activities": []
+    "activities": [],
+    "runs": []
   },
   {
     "date": "2025-12-07",
@@ -2119,6 +2137,17 @@
     "activities": [
       {
         "name": "Structured Workout",
+        "date": "2025-12-07",
+        "startTime": "2025-12-07T13:44:19.864-05:00",
+        "duration": 21,
+        "distance": 4.78,
+        "speed": 13.5
+      }
+    ],
+    "runs": [
+      {
+        "name": "Structured Workout",
+        "date": "2025-12-07",
         "startTime": "2025-12-07T13:44:19.864-05:00",
         "duration": 21,
         "distance": 4.78,

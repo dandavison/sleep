@@ -293,38 +293,26 @@
 
     function displayRuns(data) {
       const runsDiv = document.getElementById('runs');
-      const runs = [];
-
-      data.forEach(d => {
-        (d.activities || []).forEach(act => {
-          // Consider it a run if speed > 8 km/h
-          if (act.speed > 8) {
-            const startTime = new Date(act.startTime);
-            runs.push({
-              date: d.date,
-              time: startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-              duration: act.duration,
-              distance: act.distance,
-              speed: act.speed,
-            });
-          }
-        });
-      });
+      const runs = data.flatMap(d => d.runs || []);
 
       if (runs.length === 0) {
         runsDiv.innerHTML = '<p style="color: #666">No runs recorded</p>';
         return;
       }
 
-      const html = runs.map(r => `
-        <div style="margin-bottom: 8px; padding: 8px; background: #252525; border-radius: 4px;">
-          <span style="color: #888">${formatDate(r.date)}</span>
-          <span style="margin-left: 8px">${r.time}</span>
-          <span style="margin-left: 16px; color: #A895C4">${r.duration}min</span>
-          <span style="margin-left: 8px">${r.distance}km</span>
-          <span style="margin-left: 8px; color: #7B5BA4">${r.speed}km/h</span>
-        </div>
-      `).join('');
+      const html = runs.map(r => {
+        const startTime = new Date(r.startTime);
+        const time = startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        return `
+          <div style="margin-bottom: 8px; padding: 8px; background: #252525; border-radius: 4px;">
+            <span style="color: #888">${formatDate(r.date)}</span>
+            <span style="margin-left: 8px">${time}</span>
+            <span style="margin-left: 16px; color: #A895C4">${r.duration}min</span>
+            <span style="margin-left: 8px">${r.distance}km</span>
+            <span style="margin-left: 8px; color: #7B5BA4">${r.speed}km/h</span>
+          </div>
+        `;
+      }).join('');
 
       runsDiv.innerHTML = html;
     }
