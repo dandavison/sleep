@@ -170,10 +170,21 @@
                 callback: function(value, index) {
                   const d = data[index];
                   const dateLabel = formatDate(d.date);
+                  const lines = [dateLabel];
+
+                  // Add rested score if present
+                  if (d.subjective?.score != null) {
+                    lines.push(`rested: ${d.subjective.score}/10`);
+                  }
+
+                  // Add run info if present
                   const runs = d.runs || [];
-                  if (runs.length === 0) return dateLabel;
-                  const run = runs[0];
-                  return [dateLabel, '', `${run.distance.toFixed(1)}km ${run.speed.toFixed(1)}km/h`];
+                  if (runs.length > 0) {
+                    const run = runs[0];
+                    lines.push(`${run.distance.toFixed(1)}km ${run.speed.toFixed(1)}km/h`);
+                  }
+
+                  return lines.length > 1 ? lines : dateLabel;
                 }
               }
             },
