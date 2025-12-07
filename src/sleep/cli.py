@@ -129,13 +129,15 @@ def build_activities_by_date(activities: list[dict]) -> dict[str, list[dict]]:
         start = act.get("startTime", "")
         if not start:
             continue
-        # Extract date from ISO timestamp like "2025-11-30T17:21:08.323-05:00"
         activity_date = start[:10]
+        duration_min = act.get("activeDuration", 0) / 1000 / 60
+        distance_km = act.get("distance", 0)
         entry = {
             "name": act.get("activityName"),
-            "duration": act.get("activeDuration", 0) // 1000 // 60,  # ms -> minutes
-            "distance": act.get("distance", 0),  # km
-            "calories": act.get("calories", 0),
+            "startTime": start,
+            "duration": round(duration_min),
+            "distance": round(distance_km, 2),
+            "speed": round(distance_km / (duration_min / 60), 1) if duration_min > 0 else 0,
         }
         by_date.setdefault(activity_date, []).append(entry)
     return by_date
