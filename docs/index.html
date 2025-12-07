@@ -104,8 +104,8 @@
                 afterBody: items => {
                   const idx = items[0].dataIndex;
                   const d = data[idx];
-                  const total = d.deep + d.light + d.rem + d.wake;
-                  return `Total: ${formatDuration(total)}`;
+                  const sleep = d.deep + d.light + d.rem;
+                  return `Sleep: ${formatDuration(sleep)}`;
                 }
               }
             }
