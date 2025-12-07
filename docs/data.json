@@ -228,15 +228,17 @@
     "activities": [
       {
         "name": "Walk",
-        "duration": 82,
-        "distance": 5.771,
-        "calories": 570
+        "startTime": "2025-11-30T09:11:10.763-05:00",
+        "duration": 83,
+        "distance": 5.77,
+        "speed": 4.2
       },
       {
         "name": "Structured Workout",
-        "duration": 26,
-        "distance": 5.75459,
-        "calories": 326
+        "startTime": "2025-11-30T17:21:08.323-05:00",
+        "duration": 27,
+        "distance": 5.75,
+        "speed": 13.0
       }
     ]
   },
@@ -2117,9 +2119,10 @@
     "activities": [
       {
         "name": "Structured Workout",
+        "startTime": "2025-12-07T13:44:19.864-05:00",
         "duration": 21,
-        "distance": 4.78423,
-        "calories": 271
+        "distance": 4.78,
+        "speed": 13.5
       }
     ]
   }
