@@ -5,7 +5,7 @@ from pathlib import Path
 import typer
 
 from sleep.auth import load_tokens, run_auth_flow
-from sleep.fitbit import fetch_sleep_data
+from sleep.fitbit import fetch_activities, fetch_sleep_data
 
 app = typer.Typer()
 
@@ -49,27 +49,49 @@ def dump(days: int = 7):
 
 @app.command()
 def sync(days: int = 30):
-    """Fetch sleep data and save to data/sleep.json."""
-    data, new_tokens = get_sleep_data(days)
-    save_tokens_if_refreshed(new_tokens)
+    """Fetch sleep and activity data, save to data/."""
+    if not TOKENS_FILE.exists():
+        typer.echo("Not authenticated. Run 'sleep auth' first.", err=True)
+        raise typer.Exit(1)
 
+    tokens = load_tokens(TOKENS_FILE)
     DATA_DIR.mkdir(exist_ok=True)
-    out_file = DATA_DIR / "sleep.json"
-    out_file.write_text(json.dumps(data, indent=2))
-    typer.echo(f"Saved {len(data)} sleep records to {out_file}")
+
+    # Sleep
+    sleep_data, new_tokens = fetch_sleep_data(tokens["access_token"], tokens, days)
+    if new_tokens:
+        tokens = new_tokens
+        TOKENS_FILE.write_text(json.dumps(tokens, indent=2))
+    (DATA_DIR / "sleep.json").write_text(json.dumps(sleep_data, indent=2))
+    typer.echo(f"Saved {len(sleep_data)} sleep records")
+
+    # Activities
+    activities, new_tokens = fetch_activities(tokens["access_token"], tokens, days)
+    save_tokens_if_refreshed(new_tokens)
+    (DATA_DIR / "activities.json").write_text(json.dumps(activities, indent=2))
+    typer.echo(f"Saved {len(activities)} activities")
 
 
 @app.command()
 def build():
     """Transform sleep data for visualization and write to docs/data.json."""
-    raw_file = DATA_DIR / "sleep.json"
-    if not raw_file.exists():
+    sleep_file = DATA_DIR / "sleep.json"
+    activities_file = DATA_DIR / "activities.json"
+
+    if not sleep_file.exists():
         typer.echo("No data. Run 'sleep sync' first.", err=True)
         raise typer.Exit(1)
 
-    raw = json.loads(raw_file.read_text())
-    chart_data = [transform_for_chart(record) for record in raw if record.get("isMainSleep")]
+    sleep_raw = json.loads(sleep_file.read_text())
+    chart_data = [transform_for_chart(record) for record in sleep_raw if record.get("isMainSleep")]
     chart_data.sort(key=lambda x: x["date"])
+
+    # Merge activity data by date
+    if activities_file.exists():
+        activities = json.loads(activities_file.read_text())
+        activities_by_date = build_activities_by_date(activities)
+        for record in chart_data:
+            record["activities"] = activities_by_date.get(record["date"], [])
 
     docs_dir = PROJECT_ROOT / "docs"
     docs_dir.mkdir(exist_ok=True)
@@ -95,6 +117,25 @@ def transform_for_chart(record: dict) -> dict:
         "endTime": record.get("endTime"),
         "segments": segments,
     }
+
+
+def build_activities_by_date(activities: list[dict]) -> dict[str, list[dict]]:
+    """Group activities by date, extracting key fields."""
+    by_date = {}
+    for act in activities:
+        start = act.get("startTime", "")
+        if not start:
+            continue
+        # Extract date from ISO timestamp like "2025-11-30T17:21:08.323-05:00"
+        activity_date = start[:10]
+        entry = {
+            "name": act.get("activityName"),
+            "duration": act.get("activeDuration", 0) // 1000 // 60,  # ms -> minutes
+            "distance": act.get("distance", 0),  # km
+            "calories": act.get("calories", 0),
+        }
+        by_date.setdefault(activity_date, []).append(entry)
+    return by_date
 
 
 if __name__ == "__main__":
