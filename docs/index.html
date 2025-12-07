@@ -61,8 +61,6 @@
     <canvas id="scatter-chart"></canvas>
   </div>
 
-  <div id="runs" style="margin-top: 24px"></div>
-
   <script>
     const COLORS = {
       deep: '#7B5BA4',
@@ -78,9 +76,8 @@
       const labels = data.map(d => formatDate(d.date));
 
       createDurationChart(data, labels);
-      createTimelineChart(data, labels);
+      createTimelineChart(data);
       createScatterChart(data);
-      displayRuns(data);
     }
 
     function createDurationChart(data, labels) {
@@ -121,19 +118,11 @@
       });
     }
 
-    function createTimelineChart(data, labels) {
-      // Build datasets: one per stage, with floating bars [start, end] in "minutes from 6pm"
-      const stages = ['deep', 'light', 'rem', 'wake'];
-      const datasets = stages.map(stage => ({
-        label: stage.charAt(0).toUpperCase() + stage.slice(1),
-        data: data.map((d, i) => buildSegmentsForStage(d.segments, stage)),
-        backgroundColor: stage === 'wake' ? 'transparent' : COLORS[stage],
-        borderColor: COLORS[stage],
-        borderWidth: stage === 'wake' ? 2 : 0,
-        barPercentage: 0.8,
-      }));
+    function createTimelineChart(data) {
+      const labels = data.map(d => d.date);
 
       // Flatten: each segment becomes its own bar positioned at the correct x index
+      const stages = ['deep', 'light', 'rem', 'wake'];
       const flatDatasets = [];
       stages.forEach(stage => {
         data.forEach((d, dateIdx) => {
@@ -173,7 +162,21 @@
             }
           },
           scales: {
-            x: { stacked: true, grid: { display: false }, ticks: { color: '#888' } },
+            x: {
+              stacked: true,
+              grid: { display: false },
+              ticks: {
+                color: '#888',
+                callback: function(value, index) {
+                  const d = data[index];
+                  const dateLabel = formatDate(d.date);
+                  const runs = d.runs || [];
+                  if (runs.length === 0) return dateLabel;
+                  const run = runs[0];
+                  return [dateLabel, `🏃 ${run.duration}m ${run.distance}km`];
+                }
+              }
+            },
             y: {
               grid: { color: '#333' },
               min: 300,  // 10pm
@@ -289,32 +292,6 @@
       const h = Math.floor(mins / 60);
       const m = Math.round(mins % 60);
       return h > 0 ? `${h}h ${m}m` : `${m}m`;
-    }
-
-    function displayRuns(data) {
-      const runsDiv = document.getElementById('runs');
-      const runs = data.flatMap(d => d.runs || []);
-
-      if (runs.length === 0) {
-        runsDiv.innerHTML = '<p style="color: #666">No runs recorded</p>';
-        return;
-      }
-
-      const html = runs.map(r => {
-        const startTime = new Date(r.startTime);
-        const time = startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-        return `
-          <div style="margin-bottom: 8px; padding: 8px; background: #252525; border-radius: 4px;">
-            <span style="color: #888">${formatDate(r.date)}</span>
-            <span style="margin-left: 8px">${time}</span>
-            <span style="margin-left: 16px; color: #A895C4">${r.duration}min</span>
-            <span style="margin-left: 8px">${r.distance}km</span>
-            <span style="margin-left: 8px; color: #7B5BA4">${r.speed}km/h</span>
-          </div>
-        `;
-      }).join('');
-
-      runsDiv.innerHTML = html;
     }
 
     init();
