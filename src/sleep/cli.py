@@ -5,6 +5,8 @@ import sys
 from pathlib import Path
 
 import typer
+from google.oauth2 import service_account
+from googleapiclient.discovery import build as google_build
 
 from sleep.auth import load_tokens, run_auth_flow
 from sleep.fitbit import fetch_activities, fetch_sleep_data
@@ -13,9 +15,12 @@ app = typer.Typer()
 
 CONFIG_DIR = Path.home() / ".config" / "sleep"
 TOKENS_FILE = CONFIG_DIR / "tokens.json"
+GOOGLE_CREDS_FILE = CONFIG_DIR / "google-credentials.json"
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 DOCS_DIR = PROJECT_ROOT / "docs"
+
+SPREADSHEET_ID = "1hC-UoXQNH-Ra_Qqny3mN0Xc24uDNGAbzKJotCGbYt3k"
 
 
 def get_sleep_data(days: int) -> tuple[list, dict | None]:
@@ -52,7 +57,7 @@ def dump(days: int = 7):
 
 @app.command()
 def sync(days: int = 30):
-    """Fetch sleep and activity data, save to data/."""
+    """Fetch sleep, activity, and sheet data, save to data/."""
     if not TOKENS_FILE.exists():
         typer.echo("Not authenticated. Run 'sleep auth' first.", err=True)
         raise typer.Exit(1)
@@ -74,6 +79,14 @@ def sync(days: int = 30):
     (DATA_DIR / "activities.json").write_text(json.dumps(activities, indent=2))
     typer.echo(f"Saved {len(activities)} activities")
 
+    # Google Sheet (subjective data)
+    if GOOGLE_CREDS_FILE.exists():
+        sheet_data = fetch_sheet_data()
+        (DATA_DIR / "subjective.json").write_text(json.dumps(sheet_data, indent=2))
+        typer.echo(f"Saved {len(sheet_data)} subjective records")
+    else:
+        typer.echo("Skipping sheet (no Google credentials)")
+
 
 @app.command()
 def runs():
@@ -90,10 +103,40 @@ def runs():
 
 
 @app.command()
+def sheet():
+    """Dump Google Sheet as JSON to stdout."""
+    if not GOOGLE_CREDS_FILE.exists():
+        typer.echo(f"Missing {GOOGLE_CREDS_FILE}", err=True)
+        raise typer.Exit(1)
+
+    records = fetch_sheet_data()
+    json.dump(records, sys.stdout, indent=2)
+    sys.stdout.write("\n")
+
+
+def fetch_sheet_data() -> list[dict]:
+    """Fetch Google Sheet data as list of dicts (header row becomes keys)."""
+    creds = service_account.Credentials.from_service_account_file(
+        str(GOOGLE_CREDS_FILE),
+        scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"],
+    )
+    service = google_build("sheets", "v4", credentials=creds, cache_discovery=False)
+    result = service.spreadsheets().values().get(
+        spreadsheetId=SPREADSHEET_ID, range="A:Z"
+    ).execute()
+    rows = result.get("values", [])
+    if len(rows) < 2:
+        return []
+    headers = rows[0]
+    return [dict(zip(headers, row)) for row in rows[1:]]
+
+
+@app.command()
 def build():
     """Transform sleep data for visualization and write to docs/data.json."""
     sleep_file = DATA_DIR / "sleep.json"
     activities_file = DATA_DIR / "activities.json"
+    subjective_file = DATA_DIR / "subjective.json"
 
     if not sleep_file.exists():
         typer.echo("No data. Run 'sleep sync' first.", err=True)
@@ -102,6 +145,13 @@ def build():
     sleep_raw = json.loads(sleep_file.read_text())
     chart_data = [transform_for_chart(record) for record in sleep_raw if record.get("isMainSleep")]
     chart_data.sort(key=lambda x: x["date"])
+
+    # Merge subjective data by date
+    if subjective_file.exists():
+        subjective = json.loads(subjective_file.read_text())
+        subj_by_date = {row["date"]: parse_subjective(row) for row in subjective if row.get("date")}
+        for record in chart_data:
+            record["subjective"] = subj_by_date.get(record["date"])
 
     # Merge activity and run data by date
     if activities_file.exists():
@@ -178,6 +228,16 @@ def build_activities_by_date(activities: list[dict]) -> dict[str, list[dict]]:
         if processed:
             by_date.setdefault(processed["date"], []).append(processed)
     return by_date
+
+
+def parse_subjective(row: dict) -> dict:
+    """Parse subjective data row. Extract score from 'data' field like 'c9' -> 9."""
+    import re
+    data = row.get("data", "")
+    match = re.search(r"(\d+)$", data)
+    score = int(match.group(1)) if match else None
+    code = re.sub(r"\d+$", "", data) or None
+    return {"code": code, "score": score, "raw": data}
 
 
 @app.command()

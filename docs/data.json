@@ -225,6 +225,7 @@
         "seconds": 540
       }
     ],
+    "subjective": null,
     "activities": [
       {
         "name": "Walk",
@@ -465,6 +466,7 @@
         "seconds": 120
       }
     ],
+    "subjective": null,
     "activities": [],
     "runs": []
   },
@@ -724,6 +726,7 @@
         "seconds": 60
       }
     ],
+    "subjective": null,
     "activities": [],
     "runs": []
   },
@@ -943,6 +946,7 @@
         "seconds": 540
       }
     ],
+    "subjective": null,
     "activities": [],
     "runs": []
   },
@@ -1282,6 +1286,7 @@
         "seconds": 330
       }
     ],
+    "subjective": null,
     "activities": [],
     "runs": []
   },
@@ -1496,6 +1501,7 @@
         "seconds": 960
       }
     ],
+    "subjective": null,
     "activities": [],
     "runs": []
   },
@@ -1760,6 +1766,11 @@
         "seconds": 150
       }
     ],
+    "subjective": {
+      "code": "c",
+      "score": 9,
+      "raw": "c9"
+    },
     "activities": [],
     "runs": []
   },
@@ -2134,6 +2145,11 @@
         "seconds": 1650
       }
     ],
+    "subjective": {
+      "code": "c",
+      "score": 8,
+      "raw": "c8"
+    },
     "activities": [
       {
         "name": "Structured Workout",
