@@ -1,4 +1,6 @@
+import http.server
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -13,6 +15,7 @@ CONFIG_DIR = Path.home() / ".config" / "sleep"
 TOKENS_FILE = CONFIG_DIR / "tokens.json"
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
+DOCS_DIR = PROJECT_ROOT / "docs"
 
 
 def get_sleep_data(days: int) -> tuple[list, dict | None]:
@@ -136,6 +139,16 @@ def build_activities_by_date(activities: list[dict]) -> dict[str, list[dict]]:
         }
         by_date.setdefault(activity_date, []).append(entry)
     return by_date
+
+
+@app.command()
+def serve(port: int = 8000):
+    """Serve docs/ locally for development."""
+    os.chdir(DOCS_DIR)
+    handler = http.server.SimpleHTTPRequestHandler
+    with http.server.HTTPServer(("", port), handler) as httpd:
+        typer.echo(f"Serving at http://localhost:{port}")
+        httpd.serve_forever()
 
 
 if __name__ == "__main__":
