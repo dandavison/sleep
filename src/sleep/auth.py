@@ -10,7 +10,7 @@ import httpx
 AUTH_URL = "https://www.fitbit.com/oauth2/authorize"
 TOKEN_URL = "https://api.fitbit.com/oauth2/token"
 REDIRECT_URI = "http://localhost:8080/"
-SCOPES = "sleep"
+SCOPES = "sleep activity"
 
 CLIENT_ID_FILE = Path.home() / ".config" / "sleep" / "client.json"
 
@@ -108,4 +108,6 @@ def refresh_access_token(refresh_token: str) -> dict:
     )
     response.raise_for_status()
     return response.json()
+
+
 

@@ -33,3 +33,5 @@ def fetch_sleep_data(
 def _get_with_auth(url: str, access_token: str) -> httpx.Response:
     return httpx.get(url, headers={"Authorization": f"Bearer {access_token}"})
 
+
+
