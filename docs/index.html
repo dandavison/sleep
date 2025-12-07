@@ -218,8 +218,9 @@
     function createScatterChart(data) {
       const points = data.map(d => ({
         x: timeToMinutesFrom6pm(d.startTime),
-        y: d.deep + d.light + d.rem,  // actual sleep (excluding awake)
-        date: d.date
+        y: d.deep + d.light + d.rem,
+        date: d.date,
+        score: d.subjective?.score
       }));
 
       const ctx = document.getElementById('scatter-chart').getContext('2d');
@@ -228,7 +229,7 @@
         data: {
           datasets: [{
             data: points,
-            backgroundColor: COLORS.light,
+            backgroundColor: points.map(p => scoreToColor(p.score)),
             borderColor: COLORS.deep,
             borderWidth: 1,
             pointRadius: 6,
@@ -244,7 +245,8 @@
               callbacks: {
                 label: ctx => {
                   const p = ctx.raw;
-                  return `${formatDate(p.date)}: bed ${minutesToClock(p.x)}, slept ${formatDuration(p.y)}`;
+                  const scoreStr = p.score != null ? ` → ${p.score}/10` : '';
+                  return `${formatDate(p.date)}: bed ${minutesToClock(p.x)}, slept ${formatDuration(p.y)}${scoreStr}`;
                 }
               }
             }
@@ -252,27 +254,38 @@
           scales: {
             x: {
               grid: { color: '#333' },
-              min: 300,  // 10pm
-              max: 420,  // 1am
-              ticks: {
-                color: '#888',
-                stepSize: 30,
-                callback: v => minutesToClock(v)
-              }
+              min: 300,
+              max: 420,
+              ticks: { color: '#888', stepSize: 30, callback: v => minutesToClock(v) },
+              title: { display: true, text: 'Bedtime', color: '#888' }
             },
             y: {
               grid: { color: '#333' },
-              min: 240,  // 4h
-              max: 480,  // 8h
-              ticks: {
-                color: '#888',
-                stepSize: 60,
-                callback: v => formatDuration(v)
-              }
+              min: 240,
+              max: 480,
+              ticks: { color: '#888', stepSize: 60, callback: v => formatDuration(v) },
+              title: { display: true, text: 'Sleep duration', color: '#888' }
             }
           }
         }
       });
+    }
+
+    function scoreToColor(score) {
+      if (score == null) return COLORS.light;
+      // Red (0) -> Yellow (5) -> Green (10)
+      const t = score / 10;
+      if (t < 0.5) {
+        // Red to Yellow
+        const r = 255;
+        const g = Math.round(255 * (t * 2));
+        return `rgb(${r}, ${g}, 80)`;
+      } else {
+        // Yellow to Green
+        const r = Math.round(255 * (1 - (t - 0.5) * 2));
+        const g = 255;
+        return `rgb(${r}, ${g}, 80)`;
+      }
     }
 
     function createDurationVsRested(data) {
