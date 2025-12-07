@@ -76,6 +76,20 @@ def sync(days: int = 30):
 
 
 @app.command()
+def runs():
+    """Dump inferred runs as JSON to stdout."""
+    activities_file = DATA_DIR / "activities.json"
+    if not activities_file.exists():
+        typer.echo("No data. Run 'sleep sync' first.", err=True)
+        raise typer.Exit(1)
+
+    activities = json.loads(activities_file.read_text())
+    runs_list = extract_runs(activities)
+    json.dump(runs_list, sys.stdout, indent=2)
+    sys.stdout.write("\n")
+
+
+@app.command()
 def build():
     """Transform sleep data for visualization and write to docs/data.json."""
     sleep_file = DATA_DIR / "sleep.json"
@@ -89,12 +103,18 @@ def build():
     chart_data = [transform_for_chart(record) for record in sleep_raw if record.get("isMainSleep")]
     chart_data.sort(key=lambda x: x["date"])
 
-    # Merge activity data by date
+    # Merge activity and run data by date
     if activities_file.exists():
         activities = json.loads(activities_file.read_text())
         activities_by_date = build_activities_by_date(activities)
+        all_runs = extract_runs(activities)
+        runs_by_date = {}
+        for run in all_runs:
+            runs_by_date.setdefault(run["date"], []).append(run)
+
         for record in chart_data:
             record["activities"] = activities_by_date.get(record["date"], [])
+            record["runs"] = runs_by_date.get(record["date"], [])
 
     docs_dir = PROJECT_ROOT / "docs"
     docs_dir.mkdir(exist_ok=True)
@@ -122,24 +142,41 @@ def transform_for_chart(record: dict) -> dict:
     }
 
 
+def process_activity(act: dict) -> dict | None:
+    """Extract key fields from a raw activity. Returns None if invalid."""
+    start = act.get("startTime", "")
+    if not start:
+        return None
+    duration_min = act.get("activeDuration", 0) / 1000 / 60
+    distance_km = act.get("distance", 0)
+    return {
+        "name": act.get("activityName"),
+        "date": start[:10],
+        "startTime": start,
+        "duration": round(duration_min),
+        "distance": round(distance_km, 2),
+        "speed": round(distance_km / (duration_min / 60), 1) if duration_min > 0 else 0,
+    }
+
+
+def is_run(activity: dict) -> bool:
+    """Heuristic: it's a run if speed > 8 km/h."""
+    return activity.get("speed", 0) > 8
+
+
+def extract_runs(activities: list[dict]) -> list[dict]:
+    """Process raw activities and return only runs."""
+    processed = [process_activity(a) for a in activities]
+    return [a for a in processed if a and is_run(a)]
+
+
 def build_activities_by_date(activities: list[dict]) -> dict[str, list[dict]]:
-    """Group activities by date, extracting key fields."""
+    """Group processed activities by date."""
     by_date = {}
     for act in activities:
-        start = act.get("startTime", "")
-        if not start:
-            continue
-        activity_date = start[:10]
-        duration_min = act.get("activeDuration", 0) / 1000 / 60
-        distance_km = act.get("distance", 0)
-        entry = {
-            "name": act.get("activityName"),
-            "startTime": start,
-            "duration": round(duration_min),
-            "distance": round(distance_km, 2),
-            "speed": round(distance_km / (duration_min / 60), 1) if duration_min > 0 else 0,
-        }
-        by_date.setdefault(activity_date, []).append(entry)
+        processed = process_activity(act)
+        if processed:
+            by_date.setdefault(processed["date"], []).append(processed)
     return by_date
 
 
