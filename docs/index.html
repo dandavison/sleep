@@ -173,7 +173,7 @@
                   const runs = d.runs || [];
                   if (runs.length === 0) return dateLabel;
                   const run = runs[0];
-                  return [dateLabel, `🏃 ${run.duration}m ${run.distance}km`];
+                  return [dateLabel, '', `${run.distance.toFixed(1)}km ${run.speed.toFixed(1)}km/h`];
                 }
               }
             },
@@ -284,8 +284,10 @@
     }
 
     function formatDate(dateStr) {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      // Parse YYYY-MM-DD as local date (not UTC)
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const date = new Date(y, m - 1, d);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
 
     function formatDuration(mins) {
