@@ -79,7 +79,10 @@
 
     async function init() {
       const resp = await fetch('data.json');
-      const data = await resp.json();
+      const rawData = await resp.json();
+
+      // Filter out excluded days (marked with 'x' in subjective data)
+      const data = rawData.filter(d => !d.subjective?.exclude);
 
       const labels = data.map(d => formatDate(d.date));
 
@@ -182,8 +185,8 @@
                   const dateLabel = formatDate(d.date);
                   const lines = [dateLabel];
 
-                  // Add rested score if present
-                  if (d.subjective?.score != null) {
+                  // Add rested score if present (skip excluded)
+                  if (d.subjective?.score != null && !d.subjective.exclude) {
                     const s = d.subjective;
                     lines.push('', `${s.score}/10 ${s.code || ''}`);
                   }
@@ -220,7 +223,8 @@
         x: timeToMinutesFrom6pm(d.startTime),
         y: d.deep + d.light + d.rem,
         date: d.date,
-        score: d.subjective?.score
+        score: d.subjective?.score,
+        exclude: d.subjective?.exclude
       }));
 
       const ctx = document.getElementById('scatter-chart').getContext('2d');
@@ -229,7 +233,7 @@
         data: {
           datasets: [{
             data: points,
-            backgroundColor: points.map(p => scoreToColor(p.score)),
+            backgroundColor: points.map(p => scoreToColor(p.score, p.exclude)),
             borderColor: COLORS.deep,
             borderWidth: 1,
             pointRadius: 6,
@@ -271,8 +275,8 @@
       });
     }
 
-    function scoreToColor(score) {
-      if (score == null) return COLORS.light;
+    function scoreToColor(score, exclude) {
+      if (score == null || exclude) return COLORS.light;
       // Red (0) -> Yellow (5) -> Green (10)
       const t = score / 10;
       if (t < 0.5) {
@@ -290,7 +294,7 @@
 
     function createDurationVsRested(data) {
       const points = data
-        .filter(d => d.subjective?.score != null)
+        .filter(d => d.subjective?.score != null && !d.subjective.exclude)
         .map(d => ({
           x: d.deep + d.light + d.rem,
           y: d.subjective.score,
@@ -346,7 +350,7 @@
 
     function createBedtimeVsRested(data) {
       const points = data
-        .filter(d => d.subjective?.score != null)
+        .filter(d => d.subjective?.score != null && !d.subjective.exclude)
         .map(d => ({
           x: timeToMinutesFrom6pm(d.startTime),
           y: d.subjective.score,

@@ -234,10 +234,12 @@ def parse_subjective(row: dict) -> dict:
     """Parse subjective data row. Extract score from 'data' field like 'c9' -> 9."""
     import re
     data = row.get("data", "")
-    match = re.search(r"(\d+)$", data)
+    exclude = "x" in data.lower()
+    clean = data.replace("x", "").replace("X", "")
+    match = re.search(r"(\d+)", clean)
     score = int(match.group(1)) if match else None
-    code = re.sub(r"\d+$", "", data) or None
-    return {"code": code, "score": score, "raw": data}
+    code = re.sub(r"\d+", "", clean) or None
+    return {"code": code, "score": score, "raw": data, "exclude": exclude}
 
 
 @app.command()
