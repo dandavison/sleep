@@ -143,7 +143,35 @@ def build():
         raise typer.Exit(1)
 
     sleep_raw = json.loads(sleep_file.read_text())
-    chart_data = [transform_for_chart(record) for record in sleep_raw if record.get("isMainSleep")]
+    
+    # Group by date, keeping main sleep and naps separate
+    by_date: dict[str, dict] = {}
+    for record in sleep_raw:
+        date = record["dateOfSleep"]
+        if date not in by_date:
+            by_date[date] = {"main": None, "naps": []}
+        if record.get("isMainSleep"):
+            by_date[date]["main"] = record
+        else:
+            by_date[date]["naps"].append(record)
+    
+    # Transform main sleep and merge naps
+    chart_data = []
+    for date, group in by_date.items():
+        if not group["main"]:
+            continue
+        entry = transform_for_chart(group["main"])
+        # Add naps
+        for nap in group["naps"]:
+            nap_data = transform_for_chart(nap)
+            entry["deep"] += nap_data["deep"]
+            entry["light"] += nap_data["light"]
+            entry["rem"] += nap_data["rem"]
+            entry["wake"] += nap_data["wake"]
+            entry["segments"].extend(nap_data["segments"])
+        entry["segments"].sort(key=lambda s: s["dateTime"])
+        chart_data.append(entry)
+    
     chart_data.sort(key=lambda x: x["date"])
 
     # Merge subjective data by date
@@ -179,12 +207,35 @@ def transform_for_chart(record: dict) -> dict:
     levels = record.get("levels", {})
     segments = levels.get("data", []) + levels.get("shortData", [])
     segments.sort(key=lambda s: s["dateTime"])
+    
+    # Handle "stages" vs "classic" tracking
+    # Stages: deep, light, rem, wake
+    # Classic: asleep, awake, restless (naps use this)
+    if "deep" in summary:
+        deep = summary.get("deep", {}).get("minutes", 0)
+        light = summary.get("light", {}).get("minutes", 0)
+        rem = summary.get("rem", {}).get("minutes", 0)
+        wake = summary.get("wake", {}).get("minutes", 0)
+    else:
+        # Classic tracking - map asleep to light, awake+restless to wake
+        deep = 0
+        light = summary.get("asleep", {}).get("minutes", 0)
+        rem = 0
+        wake = (summary.get("awake", {}).get("minutes", 0) + 
+                summary.get("restless", {}).get("minutes", 0))
+        # Normalize segment levels for classic tracking
+        for seg in segments:
+            if seg.get("level") == "asleep":
+                seg["level"] = "light"
+            elif seg.get("level") in ("awake", "restless"):
+                seg["level"] = "wake"
+    
     return {
         "date": record["dateOfSleep"],
-        "deep": summary.get("deep", {}).get("minutes", 0),
-        "light": summary.get("light", {}).get("minutes", 0),
-        "rem": summary.get("rem", {}).get("minutes", 0),
-        "wake": summary.get("wake", {}).get("minutes", 0),
+        "deep": deep,
+        "light": light,
+        "rem": rem,
+        "wake": wake,
         "efficiency": record.get("efficiency", 0),
         "startTime": record.get("startTime"),
         "endTime": record.get("endTime"),
