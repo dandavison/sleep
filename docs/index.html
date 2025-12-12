@@ -51,6 +51,10 @@
     <canvas id="timeline-chart"></canvas>
   </div>
 
+  <div class="chart-box" style="margin-top: 24px; height: 150px">
+    <canvas id="rested-chart"></canvas>
+  </div>
+
   <div class="legend">
     <div class="legend-item"><div class="legend-color" style="background: #7B5BA4"></div>Deep</div>
     <div class="legend-item"><div class="legend-color" style="background: #A895C4"></div>Light</div>
@@ -94,6 +98,7 @@
 
       createDurationChart(data, labels);
       createTimelineChart(data);
+      createRestedChart(data, labels);
       createScatterChart(data);
       createDurationVsRested(data);
       createBedtimeVsRested(data);
@@ -257,6 +262,48 @@
                 stepSize: 60,
                 callback: v => minutesToClock(v)
               }
+            }
+          }
+        }
+      });
+    }
+
+    function createRestedChart(data, labels) {
+      const scores = data.map(d => d.subjective?.score ?? null);
+      
+      const ctx = document.getElementById('rested-chart').getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            data: scores,
+            borderColor: '#9966FF',
+            backgroundColor: '#9966FF',
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            tension: 0,
+            spanGaps: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => ctx.raw != null ? `Rested: ${ctx.raw}/10` : ''
+              }
+            }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: '#888' } },
+            y: {
+              grid: { color: '#333' },
+              min: 0,
+              max: 10,
+              ticks: { color: '#888', stepSize: 2 }
             }
           }
         }
