@@ -270,21 +270,36 @@
 
     function createRestedChart(data, labels) {
       const scores = data.map(d => d.subjective?.score ?? null);
-      
+      const durations = data.map(d => d.deep + d.light + d.rem);
+
       const ctx = document.getElementById('rested-chart').getContext('2d');
       new Chart(ctx, {
         type: 'line',
         data: {
           labels,
-          datasets: [{
-            data: scores,
-            borderColor: '#9966FF',
-            backgroundColor: '#9966FF',
-            pointRadius: 4,
-            pointHoverRadius: 6,
-            tension: 0,
-            spanGaps: true
-          }]
+          datasets: [
+            {
+              label: 'Rested',
+              data: scores,
+              borderColor: '#9966FF',
+              backgroundColor: '#9966FF',
+              pointRadius: 4,
+              pointHoverRadius: 6,
+              tension: 0,
+              spanGaps: true,
+              yAxisID: 'yRested'
+            },
+            {
+              label: 'Duration',
+              data: durations,
+              borderColor: '#00DDFF',
+              backgroundColor: '#00DDFF',
+              pointRadius: 3,
+              pointHoverRadius: 5,
+              tension: 0,
+              yAxisID: 'yDuration'
+            }
+          ]
         },
         options: {
           responsive: true,
@@ -293,17 +308,30 @@
             legend: { display: false },
             tooltip: {
               callbacks: {
-                label: ctx => ctx.raw != null ? `Rested: ${ctx.raw}/10` : ''
+                label: ctx => {
+                  if (ctx.dataset.label === 'Rested') {
+                    return ctx.raw != null ? `Rested: ${ctx.raw}/10` : '';
+                  }
+                  return `Sleep: ${formatDuration(ctx.raw)}`;
+                }
               }
             }
           },
           scales: {
             x: { grid: { display: false }, ticks: { color: '#888' } },
-            y: {
+            yRested: {
+              position: 'left',
               grid: { color: '#333' },
               min: 0,
               max: 10,
-              ticks: { color: '#888', stepSize: 2 }
+              ticks: { color: '#9966FF', stepSize: 2 }
+            },
+            yDuration: {
+              position: 'right',
+              grid: { display: false },
+              min: 240,
+              max: 480,
+              ticks: { color: '#00DDFF', callback: v => formatDuration(v) }
             }
           }
         }
