@@ -134,19 +134,34 @@
     function createTimelineChart(data) {
       const labels = data.map(d => d.date);
 
+      // Find max end time of main sleep per day to position naps
+      const mainSleepEndByDate = {};
+      data.forEach(d => {
+        const mainSegs = d.segments.filter(s => !s.isNap);
+        if (mainSegs.length) {
+          const maxEnd = Math.max(...mainSegs.map(s =>
+            timeToMinutesFrom6pm(s.dateTime) + s.seconds / 60
+          ));
+          mainSleepEndByDate[d.date] = maxEnd;
+        }
+      });
+
       // Flatten: each segment becomes its own bar positioned at the correct x index
       const stages = ['deep', 'light', 'rem', 'wake'];
       const flatDatasets = [];
+      const NAP_GAP = 60; // 1hr fake gap before naps
+
       stages.forEach(stage => {
         data.forEach((d, dateIdx) => {
-          const segs = buildSegmentsForStage(d.segments, stage);
+          const segs = buildSegmentsForStage(d.segments, stage, mainSleepEndByDate[d.date], NAP_GAP);
           segs.forEach(seg => {
+            const isNap = seg.isNap;
             flatDatasets.push({
               label: stage,
-              data: labels.map((_, i) => i === dateIdx ? seg : null),
-              backgroundColor: stage === 'wake' ? 'transparent' : COLORS[stage],
-              borderColor: COLORS[stage],
-              borderWidth: stage === 'wake' ? 2 : 1,
+              data: labels.map((_, i) => i === dateIdx ? seg.range : null),
+              backgroundColor: stage === 'wake' ? 'transparent' : (isNap ? COLORS[stage] + '99' : COLORS[stage]),
+              borderColor: isNap ? '#FF6B35' : COLORS[stage],
+              borderWidth: isNap ? 2 : (stage === 'wake' ? 2 : 1),
               borderSkipped: false,
               barPercentage: 0.6,
               categoryPercentage: 0.8,
@@ -154,6 +169,15 @@
           });
         });
       });
+
+      // Calculate y-axis max based on displaced nap positions
+      let yMax = 820;
+      flatDatasets.forEach(ds => {
+        ds.data.forEach(seg => {
+          if (seg && seg[1] > yMax) yMax = seg[1];
+        });
+      });
+      yMax = Math.ceil(yMax / 60) * 60 + 30; // Round up to next hour + padding
 
       const ctx = document.getElementById('timeline-chart').getContext('2d');
       new Chart(ctx, {
@@ -169,7 +193,10 @@
                 label: ctx => {
                   if (!ctx.raw) return '';
                   const [start, end] = ctx.raw;
-                  return `${ctx.dataset.label}: ${minutesToClock(start)} - ${minutesToClock(end)}`;
+                  // For naps, note the y-axis is fake
+                  const isNapDs = ctx.dataset.borderColor === '#FF6B35';
+                  const suffix = isNapDs ? ' (nap)' : '';
+                  return `${ctx.dataset.label}: ${minutesToClock(start)} - ${minutesToClock(end)}${suffix}`;
                 }
               }
             }
@@ -206,7 +233,7 @@
             y: {
               grid: { color: '#333' },
               min: 300,  // 10pm
-              max: 820,  // ~7:40am next day
+              max: yMax,
               ticks: {
                 color: '#888',
                 stepSize: 60,
@@ -404,14 +431,24 @@
       });
     }
 
-    function buildSegmentsForStage(segments, stage) {
-      // Return array of [startMinutes, endMinutes] for segments matching this stage
+    function buildSegmentsForStage(segments, stage, mainSleepEnd, napGap) {
+      // Return array of {range: [startMinutes, endMinutes], isNap} for segments matching this stage
+      // Nap segments are repositioned to appear after main sleep + gap
       return segments
         .filter(s => s.level === stage)
         .map(s => {
-          const start = timeToMinutesFrom6pm(s.dateTime);
-          const end = start + s.seconds / 60;
-          return [start, end];
+          let start = timeToMinutesFrom6pm(s.dateTime);
+          let end = start + s.seconds / 60;
+          const isNap = !!s.isNap;
+
+          if (isNap && mainSleepEnd != null) {
+            // Reposition nap to appear after main sleep + gap
+            const offset = (mainSleepEnd + napGap) - start;
+            start += offset;
+            end += offset;
+          }
+
+          return { range: [start, end], isNap };
         });
     }
 
