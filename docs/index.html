@@ -304,18 +304,20 @@
 
     function scoreToColor(score, exclude) {
       if (score == null || exclude) return COLORS.light;
-      // Red (0) -> Yellow (5) -> Green (10)
+      // Coral (0) -> Purple (5) -> Cyan (10)
       const t = score / 10;
       if (t < 0.5) {
-        // Red to Yellow
-        const r = 255;
-        const g = Math.round(255 * (t * 2));
-        return `rgb(${r}, ${g}, 80)`;
+        // Coral to Purple
+        const r = Math.round(255 - (255 - 153) * (t * 2));  // 255 -> 153
+        const g = Math.round(68 + (102 - 68) * (t * 2));    // 68 -> 102
+        const b = Math.round(68 + (255 - 68) * (t * 2));    // 68 -> 255
+        return `rgb(${r}, ${g}, ${b})`;
       } else {
-        // Yellow to Green
-        const r = Math.round(255 * (1 - (t - 0.5) * 2));
-        const g = 255;
-        return `rgb(${r}, ${g}, 80)`;
+        // Purple to Cyan
+        const r = Math.round(153 - 153 * ((t - 0.5) * 2));  // 153 -> 0
+        const g = Math.round(102 + (221 - 102) * ((t - 0.5) * 2)); // 102 -> 221
+        const b = 255;  // stays bright
+        return `rgb(${r}, ${g}, ${b})`;
       }
     }
 
