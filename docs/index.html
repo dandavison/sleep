@@ -303,7 +303,7 @@
     }
 
     function scoreToColor(score, exclude) {
-      if (score == null || exclude) return COLORS.light;
+      if (score == null || exclude) return 'transparent';
       // Coral (0) -> Purple (5) -> Cyan (10)
       const t = score / 10;
       if (t < 0.5) {
