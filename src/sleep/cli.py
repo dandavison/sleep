@@ -232,12 +232,17 @@ def transform_for_chart(record: dict) -> dict:
             elif seg.get("level") in ("awake", "restless"):
                 seg["level"] = "wake"
 
+    # Exclude terminal awake (final wake segment not followed by more sleep)
+    terminal_awake = 0
+    if segments and segments[-1].get("level") == "wake":
+        terminal_awake = segments[-1].get("seconds", 0) / 60
+    
     return {
         "date": record["dateOfSleep"],
         "deep": deep,
         "light": light,
         "rem": rem,
-        "wake": wake,
+        "wake": max(0, wake - terminal_awake),
         "efficiency": record.get("efficiency", 0),
         "startTime": record.get("startTime"),
         "endTime": record.get("endTime"),
