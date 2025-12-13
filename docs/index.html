@@ -193,14 +193,34 @@
         });
       });
 
-      // Calculate y-axis max based on displaced nap positions
+      // Calculate y-axis bounds based on data
+      let yMin = 300;  // default 10pm
       let yMax = 820;
       flatDatasets.forEach(ds => {
         ds.data.forEach(seg => {
-          if (seg && seg[1] > yMax) yMax = seg[1];
+          if (seg) {
+            if (seg[0] < yMin) yMin = seg[0];
+            if (seg[1] > yMax) yMax = seg[1];
+          }
         });
       });
+      yMin = Math.floor(yMin / 60) * 60 - 30; // Round down to hour - padding
       yMax = Math.ceil(yMax / 60) * 60 + 30; // Round up to next hour + padding
+
+      // Check for clipped data and warn
+      let clippedDates = [];
+      data.forEach(d => {
+        const mainSegs = d.segments.filter(s => !s.isNap);
+        mainSegs.forEach(s => {
+          const start = timeToMinutesFrom6pm(s.dateTime);
+          if (start < yMin) {
+            clippedDates.push(formatDate(d.date));
+          }
+        });
+      });
+      if (clippedDates.length > 0) {
+        console.warn('Data clipped on:', [...new Set(clippedDates)]);
+      }
 
       const ctx = document.getElementById('timeline-chart').getContext('2d');
       new Chart(ctx, {
@@ -255,7 +275,7 @@
             },
             y: {
               grid: { color: '#333' },
-              min: 300,  // 10pm
+              min: yMin,
               max: yMax,
               ticks: {
                 color: '#888',
