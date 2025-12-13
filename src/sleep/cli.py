@@ -236,7 +236,7 @@ def transform_for_chart(record: dict) -> dict:
     terminal_awake = 0
     if segments and segments[-1].get("level") == "wake":
         terminal_awake = segments[-1].get("seconds", 0) / 60
-    
+
     return {
         "date": record["dateOfSleep"],
         "deep": deep,
