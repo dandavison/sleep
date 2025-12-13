@@ -148,7 +148,7 @@
           },
           scales: {
             x: { stacked: true, grid: { display: false }, ticks: { color: '#888' } },
-            y: { stacked: true, grid: { color: '#333' }, ticks: { color: '#888', callback: v => formatDuration(v) } }
+            y: { stacked: true, grid: { color: '#333' }, ticks: { color: '#888', stepSize: 60, callback: v => formatDuration(v) } }
           }
         }
       });
@@ -204,8 +204,8 @@
           }
         });
       });
-      yMin = Math.floor(yMin / 60) * 60 - 30; // Round down to hour - padding
-      yMax = Math.ceil(yMax / 60) * 60 + 30; // Round up to next hour + padding
+      yMin = Math.floor(yMin / 60) * 60; // Round down to hour
+      yMax = Math.ceil(yMax / 60) * 60; // Round up to hour
 
       // Check for clipped data and warn
       let clippedDates = [];
