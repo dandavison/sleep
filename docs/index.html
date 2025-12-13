@@ -183,7 +183,7 @@
               label: stage,
               data: labels.map((_, i) => i === dateIdx ? seg.range : null),
               backgroundColor: stage === 'wake' ? 'transparent' : (isNap ? COLORS[stage] + '99' : COLORS[stage]),
-              borderColor: isNap ? '#FF6B35' : COLORS[stage],
+              borderColor: isNap ? '#888' : COLORS[stage],
               borderWidth: isNap ? 2 : (stage === 'wake' ? 2 : 1),
               borderSkipped: false,
               barPercentage: 0.6,
@@ -217,7 +217,7 @@
                   if (!ctx.raw) return '';
                   const [start, end] = ctx.raw;
                   // For naps, note the y-axis is fake
-                  const isNapDs = ctx.dataset.borderColor === '#FF6B35';
+                  const isNapDs = ctx.dataset.borderColor === '#888';
                   const suffix = isNapDs ? ' (nap)' : '';
                   return `${ctx.dataset.label}: ${minutesToClock(start)} - ${minutesToClock(end)}${suffix}`;
                 }
