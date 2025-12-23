@@ -18,7 +18,7 @@ TOKENS_FILE = CONFIG_DIR / "tokens.json"
 GOOGLE_CREDS_FILE = CONFIG_DIR / "google-credentials.json"
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
-DOCS_DIR = PROJECT_ROOT / "docs"
+UI_DIR = PROJECT_ROOT / "ui"
 
 SPREADSHEET_ID = "1hC-UoXQNH-Ra_Qqny3mN0Xc24uDNGAbzKJotCGbYt3k"
 
@@ -133,7 +133,7 @@ def fetch_sheet_data() -> list[dict]:
 
 @app.command()
 def build():
-    """Transform sleep data for visualization and write to docs/data.json."""
+    """Transform sleep data for visualization and write to ui/data.json."""
     sleep_file = DATA_DIR / "sleep.json"
     fixups_file = DATA_DIR / "fixups.json"
     activities_file = DATA_DIR / "activities.json"
@@ -217,9 +217,9 @@ def build():
             record["activities"] = activities_by_date.get(record["date"], [])
             record["runs"] = runs_by_date.get(record["date"], [])
 
-    docs_dir = PROJECT_ROOT / "docs"
-    docs_dir.mkdir(exist_ok=True)
-    out_file = docs_dir / "data.json"
+    ui_dir = PROJECT_ROOT / "ui"
+    ui_dir.mkdir(exist_ok=True)
+    out_file = ui_dir / "data.json"
     out_file.write_text(json.dumps(chart_data, indent=2))
     typer.echo(f"Wrote {len(chart_data)} records to {out_file}")
 
@@ -569,8 +569,8 @@ def fixup(
 
 @app.command()
 def serve(port: int = 8000):
-    """Serve docs/ locally for development."""
-    os.chdir(DOCS_DIR)
+    """Serve ui/ locally for development."""
+    os.chdir(UI_DIR)
     handler = http.server.SimpleHTTPRequestHandler
     with http.server.HTTPServer(("", port), handler) as httpd:
         typer.echo(f"Serving at http://localhost:{port}")
