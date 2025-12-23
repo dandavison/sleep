@@ -292,6 +292,11 @@
     function createRestedChart(data, labels) {
       const scores = data.map(d => d.subjective?.score ?? null);
       const durations = data.map(d => d.deep + d.light + d.rem);
+      const bedtimes = data.map(d => timeToMinutesFrom6pm(d.startTime));
+
+      // Calculate bedtime axis bounds from data
+      const btMin = Math.floor((Math.min(...bedtimes) - 15) / 30) * 30;
+      const btMax = Math.ceil((Math.max(...bedtimes) + 15) / 30) * 30;
 
       const ctx = document.getElementById('rested-chart').getContext('2d');
       new Chart(ctx, {
@@ -319,6 +324,16 @@
               pointHoverRadius: 5,
               tension: 0,
               yAxisID: 'yDuration'
+            },
+            {
+              label: 'Bedtime',
+              data: bedtimes,
+              borderColor: '#E8A87C',
+              backgroundColor: '#E8A87C',
+              pointRadius: 3,
+              pointHoverRadius: 5,
+              tension: 0,
+              yAxisID: 'yBedtime'
             }
           ]
         },
@@ -333,6 +348,9 @@
                   if (ctx.dataset.label === 'Rested') {
                     return ctx.raw != null ? `Rested: ${ctx.raw}/10` : '';
                   }
+                  if (ctx.dataset.label === 'Bedtime') {
+                    return `Bedtime: ${minutesToClock(ctx.raw)}`;
+                  }
                   return `Sleep: ${formatDuration(ctx.raw)}`;
                 }
               }
@@ -345,7 +363,15 @@
               grid: { color: '#333' },
               min: 0,
               max: 10,
-              ticks: { color: '#9966FF', stepSize: 2 }
+              display: false  // Hide axis but keep scale for data
+            },
+            yBedtime: {
+              position: 'left',
+              grid: { display: false },
+              min: btMin,
+              max: btMax,
+              reverse: true,  // Earlier bedtime = higher on chart (better)
+              ticks: { color: '#E8A87C', callback: v => minutesToClock(v) }
             },
             yDuration: {
               position: 'right',
