@@ -135,6 +135,7 @@ def fetch_sheet_data() -> list[dict]:
 def build():
     """Transform sleep data for visualization and write to docs/data.json."""
     sleep_file = DATA_DIR / "sleep.json"
+    fixups_file = DATA_DIR / "fixups.json"
     activities_file = DATA_DIR / "activities.json"
     subjective_file = DATA_DIR / "subjective.json"
 
@@ -143,6 +144,12 @@ def build():
         raise typer.Exit(1)
 
     sleep_raw = json.loads(sleep_file.read_text())
+
+    # Merge manual fixups if present
+    if fixups_file.exists():
+        fixups = json.loads(fixups_file.read_text())
+        sleep_raw.extend(fixups)
+        typer.echo(f"Merged {len(fixups)} fixup records")
 
     # Group by date, keeping main sleep and naps separate
     by_date: dict[str, dict] = {}
@@ -155,21 +162,35 @@ def build():
         else:
             by_date[date]["naps"].append(record)
 
-    # Transform main sleep and merge naps
+    # Transform main sleep and merge naps/fixups
     chart_data = []
     for date, group in by_date.items():
         if not group["main"]:
             continue
         entry = transform_for_chart(group["main"])
-        # Add naps - mark their segments
+        main_start = entry["startTime"]
+
+        # Add naps/fixups - distinguish between true naps and pre-sleep fixups
         for nap in group["naps"]:
             nap_data = transform_for_chart(nap)
             entry["deep"] += nap_data["deep"]
             entry["light"] += nap_data["light"]
             entry["rem"] += nap_data["rem"]
             entry["wake"] += nap_data["wake"]
-            for seg in nap_data["segments"]:
-                seg["isNap"] = True
+
+            # If this record ends at or before main sleep starts, it's a fixup
+            # extending the sleep backward, not a true nap
+            is_presleep_fixup = nap_data["endTime"] <= main_start
+
+            if is_presleep_fixup:
+                # Update the entry's start time to the earlier fixup start
+                if nap_data["startTime"] < entry["startTime"]:
+                    entry["startTime"] = nap_data["startTime"]
+            else:
+                # True nap - mark segments so they render separately
+                for seg in nap_data["segments"]:
+                    seg["isNap"] = True
+
             entry["segments"].extend(nap_data["segments"])
         entry["segments"].sort(key=lambda s: s["dateTime"])
         chart_data.append(entry)
@@ -298,6 +319,252 @@ def parse_subjective(row: dict) -> dict:
     score = int(match.group(1)) if match else None
     code = re.sub(r"\d+", "", clean) or None
     return {"code": code, "score": score, "raw": data, "exclude": exclude}
+
+
+def generate_fixup_segments(
+    reference_record: dict,
+    start_time: str,
+    end_time: str,
+    comment: str = "",
+) -> dict:
+    """
+    Generate a realistic fixup sleep record based on a reference night's data.
+
+    This is used when the Fitbit fails to capture part of a sleep session.
+    The fixup uses the stage proportions and segment duration distributions
+    from the reference record to generate plausible synthetic segments.
+
+    Args:
+        reference_record: A Fitbit sleep record to use as the statistical basis
+        start_time: ISO format start time for the fixup (e.g. "2025-12-20T00:00:00.000")
+        end_time: ISO format end time for the fixup
+        comment: Optional explanation for why this fixup was created
+
+    Returns:
+        A sleep record dict in Fitbit format with isMainSleep=False and logType="manual_fixup"
+    """
+    import random
+    from datetime import datetime, timedelta
+
+    # Parse times
+    start_dt = datetime.fromisoformat(start_time.replace(".000", ""))
+    end_dt = datetime.fromisoformat(end_time.replace(".000", ""))
+    total_seconds = int((end_dt - start_dt).total_seconds())
+
+    # Extract stage proportions from reference record
+    summary = reference_record.get("levels", {}).get("summary", {})
+    stage_minutes = {
+        "deep": summary.get("deep", {}).get("minutes", 0),
+        "light": summary.get("light", {}).get("minutes", 0),
+        "rem": summary.get("rem", {}).get("minutes", 0),
+        "wake": summary.get("wake", {}).get("minutes", 0),
+    }
+    total_minutes = sum(stage_minutes.values()) or 1
+    stage_proportions = {k: v / total_minutes for k, v in stage_minutes.items()}
+
+    # Extract segment durations from reference for realistic length distribution
+    ref_segments = reference_record.get("levels", {}).get("data", [])
+    durations_by_stage = {stage: [] for stage in ["deep", "light", "rem", "wake"]}
+    for seg in ref_segments:
+        level = seg.get("level")
+        if level in durations_by_stage:
+            durations_by_stage[level].append(seg.get("seconds", 60))
+
+    # Ensure we have some durations for each stage (fallback to defaults)
+    defaults = {"deep": [300, 600, 900], "light": [180, 360, 600], "rem": [300, 600], "wake": [60, 180, 300]}
+    for stage in durations_by_stage:
+        if not durations_by_stage[stage]:
+            durations_by_stage[stage] = defaults[stage]
+
+    # Generate segments
+    segments = []
+    current_dt = start_dt
+    remaining_seconds = total_seconds
+
+    # Typically start with wake then light (falling asleep pattern)
+    stages_order = ["wake", "light", "deep", "light", "rem", "light"]  # Initial cycle hint
+
+    while remaining_seconds > 30:
+        # Pick stage weighted by proportions, with some temporal bias
+        # (more deep early, more REM later in sleep)
+        elapsed_ratio = 1 - (remaining_seconds / total_seconds)
+
+        weights = stage_proportions.copy()
+        # Bias: more deep in first half, more REM in second half
+        if elapsed_ratio < 0.5:
+            weights["deep"] *= 1.5
+            weights["rem"] *= 0.5
+        else:
+            weights["deep"] *= 0.5
+            weights["rem"] *= 1.5
+
+        # Don't have too much wake
+        weights["wake"] *= 0.3
+
+        stages = list(weights.keys())
+        stage_weights = [weights[s] for s in stages]
+        total_weight = sum(stage_weights)
+        stage_weights = [w / total_weight for w in stage_weights]
+
+        stage = random.choices(stages, weights=stage_weights, k=1)[0]
+
+        # Pick duration from reference distribution
+        duration = random.choice(durations_by_stage[stage])
+        duration = min(duration, remaining_seconds)
+        duration = max(30, duration)  # Minimum 30 seconds
+
+        segments.append({
+            "dateTime": current_dt.strftime("%Y-%m-%dT%H:%M:%S.000"),
+            "level": stage,
+            "seconds": duration,
+        })
+
+        current_dt += timedelta(seconds=duration)
+        remaining_seconds -= duration
+
+    # End with a wake segment
+    if segments and segments[-1]["level"] != "wake":
+        wake_duration = min(180, max(30, remaining_seconds))
+        segments.append({
+            "dateTime": current_dt.strftime("%Y-%m-%dT%H:%M:%S.000"),
+            "level": "wake",
+            "seconds": wake_duration,
+        })
+
+    # Calculate summary from generated segments
+    generated_summary = {"deep": 0, "light": 0, "rem": 0, "wake": 0}
+    for seg in segments:
+        generated_summary[seg["level"]] += seg["seconds"] // 60
+
+    # Build the fixup record
+    date_of_sleep = end_dt.strftime("%Y-%m-%d")
+    if end_dt.hour < 12:  # If ends in morning, date is that day
+        date_of_sleep = end_dt.strftime("%Y-%m-%d")
+    else:  # If ends in afternoon/evening, might be next day
+        date_of_sleep = (end_dt + timedelta(days=1)).strftime("%Y-%m-%d") if end_dt.hour >= 18 else end_dt.strftime("%Y-%m-%d")
+
+    return {
+        "dateOfSleep": date_of_sleep,
+        "duration": total_seconds * 1000,
+        "efficiency": reference_record.get("efficiency", 85),
+        "startTime": start_time,
+        "endTime": end_time,
+        "infoCode": 0,
+        "isMainSleep": False,
+        "levels": {
+            "data": segments,
+            "shortData": [],
+            "summary": {
+                "deep": {"count": sum(1 for s in segments if s["level"] == "deep"), "minutes": generated_summary["deep"], "thirtyDayAvgMinutes": 0},
+                "light": {"count": sum(1 for s in segments if s["level"] == "light"), "minutes": generated_summary["light"], "thirtyDayAvgMinutes": 0},
+                "rem": {"count": sum(1 for s in segments if s["level"] == "rem"), "minutes": generated_summary["rem"], "thirtyDayAvgMinutes": 0},
+                "wake": {"count": sum(1 for s in segments if s["level"] == "wake"), "minutes": generated_summary["wake"], "thirtyDayAvgMinutes": 0},
+            },
+        },
+        "logId": None,
+        "minutesAfterWakeup": 0,
+        "minutesAwake": generated_summary["wake"],
+        "minutesAsleep": generated_summary["deep"] + generated_summary["light"] + generated_summary["rem"],
+        "minutesToFallAsleep": 0,
+        "logType": "manual_fixup",
+        "timeInBed": total_seconds // 60,
+        "type": "stages",
+        "comment": comment,
+    }
+
+
+@app.command()
+def fixup(
+    date: str = typer.Argument(..., help="Date of sleep in YYYY-MM-DD format"),
+    start: str = typer.Argument(..., help="Start time in HH:MM format (24h)"),
+    end: str = typer.Argument(..., help="End time in HH:MM format (24h)"),
+    comment: str = typer.Option("", help="Optional comment explaining the fixup"),
+):
+    """
+    Generate a fixup sleep record for when Fitbit missed part of a sleep session.
+
+    Segments are generated randomly using stage proportions and duration distributions
+    from that night's actual recorded sleep data, making them statistically realistic.
+
+    Example: sleep fixup 2025-12-20 00:00 03:15 --comment "Watch missed early sleep"
+    """
+    from datetime import datetime, timedelta
+
+    sleep_file = DATA_DIR / "sleep.json"
+    fixups_file = DATA_DIR / "fixups.json"
+
+    if not sleep_file.exists():
+        typer.echo("No data. Run 'sleep sync' first.", err=True)
+        raise typer.Exit(1)
+
+    sleep_raw = json.loads(sleep_file.read_text())
+
+    # Find the reference record for this date
+    reference = None
+    for record in sleep_raw:
+        if record.get("dateOfSleep") == date and record.get("isMainSleep"):
+            reference = record
+            break
+
+    if not reference:
+        typer.echo(f"No main sleep record found for {date}", err=True)
+        raise typer.Exit(1)
+
+    # Parse start/end times - figure out the actual dates
+    # Times are relative to a sleep session: evening times (>=18:00) are the night before,
+    # early morning times (<12:00) are on the sleep date itself
+    start_hour = int(start.split(":")[0])
+    end_hour = int(end.split(":")[0])
+
+    sleep_date = datetime.strptime(date, "%Y-%m-%d")
+
+    # Determine start date
+    if start_hour >= 18:
+        start_date = sleep_date - timedelta(days=1)
+    else:
+        start_date = sleep_date
+
+    # Determine end date - same logic, but also handle end being after start
+    if end_hour >= 18:
+        end_date = sleep_date - timedelta(days=1)
+    else:
+        end_date = sleep_date
+
+    # Sanity check: if end appears before start (e.g., start=23:00, end=02:00), end is next day
+    start_time_obj = datetime.strptime(f"{start_date.strftime('%Y-%m-%d')} {start}", "%Y-%m-%d %H:%M")
+    end_time_obj = datetime.strptime(f"{end_date.strftime('%Y-%m-%d')} {end}", "%Y-%m-%d %H:%M")
+    if end_time_obj <= start_time_obj:
+        end_date += timedelta(days=1)
+
+    start_time = f"{start_date.strftime('%Y-%m-%d')}T{start}:00.000"
+    end_time = f"{end_date.strftime('%Y-%m-%d')}T{end}:00.000"
+
+    # Generate the fixup
+    fixup_record = generate_fixup_segments(
+        reference,
+        start_time,
+        end_time,
+        comment or f"Fitbit missed sleep before {end}",
+    )
+
+    # Load existing fixups or start fresh
+    if fixups_file.exists():
+        fixups = json.loads(fixups_file.read_text())
+    else:
+        fixups = []
+
+    # Remove any existing fixup for same date/time range
+    fixups = [f for f in fixups if not (f.get("dateOfSleep") == date and f.get("startTime") == start_time)]
+
+    fixups.append(fixup_record)
+    fixups_file.write_text(json.dumps(fixups, indent=2))
+
+    total_mins = fixup_record["timeInBed"]
+    summary = fixup_record["levels"]["summary"]
+    typer.echo(f"Created fixup for {date}: {start} - {end} ({total_mins} min)")
+    typer.echo(f"  Deep: {summary['deep']['minutes']}m, Light: {summary['light']['minutes']}m, "
+               f"REM: {summary['rem']['minutes']}m, Wake: {summary['wake']['minutes']}m")
+    typer.echo(f"Saved to {fixups_file}")
 
 
 @app.command()
