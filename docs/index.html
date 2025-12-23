@@ -265,8 +265,9 @@
                   const runs = d.runs || [];
                   if (runs.length > 0) {
                     lines.push('');
-                    const run = runs[0];
-                    lines.push(`${run.distance.toFixed(1)}km ${run.speed.toFixed(1)}km/h`);
+                    for (const run of runs) {
+                      lines.push(`${run.distance.toFixed(1)}km ${run.speed.toFixed(1)}km/h`);
+                    }
                   }
 
                   return lines.length > 1 ? lines : dateLabel;
@@ -367,6 +368,14 @@
         exclude: d.subjective?.exclude
       }));
 
+      // Calculate axis bounds from data with padding
+      const xValues = points.map(p => p.x);
+      const yValues = points.map(p => p.y);
+      const xMin = Math.floor((Math.min(...xValues) - 15) / 30) * 30;  // Round down to 30min
+      const xMax = Math.ceil((Math.max(...xValues) + 15) / 30) * 30;   // Round up to 30min
+      const yMin = Math.floor((Math.min(...yValues) - 30) / 60) * 60;  // Round down to hour
+      const yMax = Math.ceil((Math.max(...yValues) + 30) / 60) * 60;   // Round up to hour
+
       const ctx = document.getElementById('scatter-chart').getContext('2d');
       new Chart(ctx, {
         type: 'scatter',
@@ -398,15 +407,15 @@
           scales: {
             x: {
               grid: { color: '#333' },
-              min: 210,
-              max: 420,
+              min: xMin,
+              max: xMax,
               ticks: { color: '#888', stepSize: 30, callback: v => minutesToClock(v) },
               title: { display: true, text: 'Bedtime', color: '#888' }
             },
             y: {
               grid: { color: '#333' },
-              min: 240,
-              max: 480,
+              min: yMin,
+              max: yMax,
               ticks: { color: '#888', stepSize: 60, callback: v => formatDuration(v) },
               title: { display: true, text: 'Sleep duration', color: '#888' }
             }
@@ -443,6 +452,11 @@
           date: d.date
         }));
 
+      // Calculate x-axis bounds from data with padding (y is always 0-10 for scores)
+      const xValues = points.map(p => p.x);
+      const xMin = Math.floor((Math.min(...xValues) - 30) / 60) * 60;
+      const xMax = Math.ceil((Math.max(...xValues) + 30) / 60) * 60;
+
       const ctx = document.getElementById('duration-vs-rested').getContext('2d');
       new Chart(ctx, {
         type: 'scatter',
@@ -473,8 +487,8 @@
           scales: {
             x: {
               grid: { color: '#333' },
-              min: 240,
-              max: 480,
+              min: xMin,
+              max: xMax,
               ticks: { color: '#888', callback: v => formatDuration(v) },
               title: { display: true, text: 'Sleep duration', color: '#888' }
             },
@@ -498,6 +512,11 @@
           y: d.subjective.score,
           date: d.date
         }));
+
+      // Calculate x-axis bounds from data with padding (y is always 0-10 for scores)
+      const xValues = points.map(p => p.x);
+      const xMin = Math.floor((Math.min(...xValues) - 15) / 30) * 30;
+      const xMax = Math.ceil((Math.max(...xValues) + 15) / 30) * 30;
 
       const ctx = document.getElementById('bedtime-vs-rested').getContext('2d');
       new Chart(ctx, {
@@ -529,8 +548,8 @@
           scales: {
             x: {
               grid: { color: '#333' },
-              min: 210,
-              max: 420,
+              min: xMin,
+              max: xMax,
               ticks: { color: '#888', stepSize: 30, callback: v => minutesToClock(v) },
               title: { display: true, text: 'Bedtime', color: '#888' }
             },
