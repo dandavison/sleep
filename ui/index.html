@@ -291,12 +291,17 @@
 
     function createRestedChart(data, labels) {
       const scores = data.map(d => d.subjective?.score ?? null);
-      const durations = data.map(d => d.deep + d.light + d.rem);
-      const bedtimes = data.map(d => timeToMinutesFrom6pm(d.startTime));
+      const durations = data.map(d => d.deep != null ? d.deep + d.light + d.rem : null);
+      const bedtimes = data.map(d => d.startTime ? timeToMinutesFrom6pm(d.startTime) : null);
 
-      // Calculate bedtime axis bounds from data
-      const btMin = Math.floor((Math.min(...bedtimes) - 15) / 30) * 30;
-      const btMax = Math.ceil((Math.max(...bedtimes) + 15) / 30) * 30;
+      // Calculate axis bounds from data (filter nulls)
+      const validBedtimes = bedtimes.filter(b => b != null);
+      const btMin = Math.floor((Math.min(...validBedtimes) - 15) / 30) * 30;
+      const btMax = Math.ceil((Math.max(...validBedtimes) + 15) / 30) * 30;
+
+      const validDurations = durations.filter(d => d != null);
+      const durMin = Math.floor((Math.min(...validDurations) - 30) / 60) * 60;
+      const durMax = Math.ceil((Math.max(...validDurations) + 30) / 60) * 60;
 
       const ctx = document.getElementById('rested-chart').getContext('2d');
       new Chart(ctx, {
@@ -323,6 +328,7 @@
               pointRadius: 3,
               pointHoverRadius: 5,
               tension: 0,
+              spanGaps: true,
               yAxisID: 'yDuration'
             },
             {
@@ -333,6 +339,7 @@
               pointRadius: 3,
               pointHoverRadius: 5,
               tension: 0,
+              spanGaps: true,
               yAxisID: 'yBedtime'
             }
           ]
@@ -376,8 +383,8 @@
             yDuration: {
               position: 'right',
               grid: { display: false },
-              min: 240,
-              max: 480,
+              min: durMin,
+              max: durMax,
               ticks: { color: '#6BA3A3', callback: v => formatDuration(v) }
             }
           }
@@ -386,13 +393,15 @@
     }
 
     function createScatterChart(data) {
-      const points = data.map(d => ({
-        x: timeToMinutesFrom6pm(d.startTime),
-        y: d.deep + d.light + d.rem,
-        date: d.date,
-        score: d.subjective?.score,
-        exclude: d.subjective?.exclude
-      }));
+      const points = data
+        .filter(d => d.startTime != null && d.deep != null)
+        .map(d => ({
+          x: timeToMinutesFrom6pm(d.startTime),
+          y: d.deep + d.light + d.rem,
+          date: d.date,
+          score: d.subjective?.score,
+          exclude: d.subjective?.exclude
+        }));
 
       // Calculate axis bounds from data with padding
       const xValues = points.map(p => p.x);
@@ -471,7 +480,7 @@
 
     function createDurationVsRested(data) {
       const points = data
-        .filter(d => d.subjective?.score != null && !d.subjective.exclude)
+        .filter(d => d.deep != null && d.subjective?.score != null && !d.subjective.exclude)
         .map(d => ({
           x: d.deep + d.light + d.rem,
           y: d.subjective.score,
@@ -532,7 +541,7 @@
 
     function createBedtimeVsRested(data) {
       const points = data
-        .filter(d => d.subjective?.score != null && !d.subjective.exclude)
+        .filter(d => d.startTime != null && d.subjective?.score != null && !d.subjective.exclude)
         .map(d => ({
           x: timeToMinutesFrom6pm(d.startTime),
           y: d.subjective.score,

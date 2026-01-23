@@ -197,6 +197,9 @@ def build():
 
     chart_data.sort(key=lambda x: x["date"])
 
+    # Fill in missing dates so charts show continuous timeline
+    chart_data = fill_missing_dates(chart_data)
+
     # Merge subjective data by date
     if subjective_file.exists():
         subjective = json.loads(subjective_file.read_text())
@@ -319,6 +322,41 @@ def parse_subjective(row: dict) -> dict:
     score = int(match.group(1)) if match else None
     code = re.sub(r"\d+", "", clean) or None
     return {"code": code, "score": score, "raw": data, "exclude": exclude}
+
+
+def fill_missing_dates(chart_data: list[dict]) -> list[dict]:
+    """Fill in missing dates with empty placeholder entries."""
+    from datetime import datetime, timedelta
+
+    if not chart_data:
+        return chart_data
+
+    dates_with_data = {d["date"] for d in chart_data}
+    start_date = datetime.strptime(min(dates_with_data), "%Y-%m-%d")
+    end_date = datetime.strptime(max(dates_with_data), "%Y-%m-%d")
+
+    result = []
+    current = start_date
+    while current <= end_date:
+        date_str = current.strftime("%Y-%m-%d")
+        existing = next((d for d in chart_data if d["date"] == date_str), None)
+        if existing:
+            result.append(existing)
+        else:
+            result.append({
+                "date": date_str,
+                "deep": None,
+                "light": None,
+                "rem": None,
+                "wake": None,
+                "efficiency": None,
+                "startTime": None,
+                "endTime": None,
+                "segments": [],
+            })
+        current += timedelta(days=1)
+
+    return result
 
 
 def generate_fixup_segments(
